@@ -259,10 +259,15 @@ struct IALSTrainer {
     DenseMatrix result(result_size, n_items);
     std::vector<std::thread> workers;
     std::atomic<int64_t> cursor(0);
-    for (size_t ind = 0; ind < config_.n_threads; ind++) {
-      workers.emplace_back([this, userblock_begin, &cursor, result_size,
-                            &result]() {
-        const int64_t chunk_size = 16;
+
+    const int64_t chunk_size =
+        std::min(static_cast<int64_t>(16),
+                 (result_size / static_cast<int64_t>(config_.n_threads)));
+    for (size_t ind = 0;
+         ind < std::min(config_.n_threads, static_cast<size_t>(result_size));
+         ind++) {
+      workers.emplace_back([this, userblock_begin, chunk_size, &cursor,
+                            result_size, &result]() {
         while (true) {
           auto block_begin = cursor.fetch_add(chunk_size);
           if (block_begin >= result_size) {

@@ -93,9 +93,11 @@ template <typename Real, class SimilarityType> struct KNNComputer {
     */
 
     using IndexType = typename CSCMatrix::StorageIndex;
+    using ValueAndIndex = std::pair<Real, IndexType>;
 
     std::vector<Triplet> triples;
-    std::vector<IndexType> buffer(this->N);
+    std::vector<ValueAndIndex> buffer;
+    buffer.reserve(this->N);
 
     for (size_t cursor = start; cursor < end; cursor += this->max_chunk_size) {
       size_t end_local = std::min(cursor + this->max_chunk_size, end);
@@ -112,18 +114,23 @@ template <typename Real, class SimilarityType> struct KNNComputer {
         size_t col_size = std::min(nz_size, top_k);
         auto data_start = data_ptr + index_start_ptr[row];
         auto index_start = index_ptr + index_start_ptr[row];
+
+        buffer.clear();
         for (size_t i = 0; i < nz_size; i++) {
-          buffer[i] = i;
+          buffer.emplace_back(data_start[i], i);
         }
-        std::sort(buffer.begin(), buffer.begin() + nz_size,
-                  [&data_start](IndexType &col1, IndexType &col2) {
-                    return data_start[col1] > data_start[col2];
+        std::partial_sort(buffer.begin(),
+                          buffer.begin() + std::min(nz_size, top_k),
+                          buffer.begin() + nz_size);
+        std::sort(buffer.begin(), buffer.begin() + col_size,
+                  [](ValueAndIndex i1, ValueAndIndex i2) {
+                    return i1.second < i2.second;
                   });
-        std::sort(buffer.begin(), buffer.begin() + col_size);
         for (size_t j = 0; j < col_size; j++) {
-          triples.emplace_back(row + cursor,
-                               static_cast<IndexType>(index_start[buffer[j]]),
-                               data_start[buffer[j]]);
+          triples.emplace_back(
+              row + cursor,
+              static_cast<IndexType>(index_start[buffer[j].second]),
+              data_start[buffer[j].second]);
         }
       }
     }

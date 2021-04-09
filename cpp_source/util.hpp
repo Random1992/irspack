@@ -436,12 +436,12 @@ retrieve_recommend_from_score(
           allowed_indices.empty(),
       "allowed_indices, if not empty, must have a size equal to X.rows()");
   std::vector<std::vector<score_and_index>> result(score.rows());
-  std::vector<std::future<void>> workers;
+  std::vector<std::thread> workers;
   std::atomic<size_t> cursor(0);
   const size_t n_users = static_cast<size_t>(score.rows());
   for (size_t thread = 0; thread < std::min(n_threads, n_users); thread++) {
     workers.emplace_back(
-        std::async([&score, cutoff, &allowed_indices, &cursor, &result]() {
+        [&score, cutoff, &allowed_indices, &cursor, &result]() {
           const int64_t n_rows = score.rows();
           const int64_t n_items = score.cols();
           std::vector<score_and_index> index_holder;
@@ -488,9 +488,11 @@ retrieve_recommend_from_score(
               items_recommended++;
             }
           }
-        }));
+        });
   }
-  workers.clear();
+  for (auto &worker : workers) {
+    worker.join();
+  }
   return result;
 }
 
