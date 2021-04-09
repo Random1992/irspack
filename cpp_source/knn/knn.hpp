@@ -119,9 +119,11 @@ template <typename Real, class SimilarityType> struct KNNComputer {
         for (size_t i = 0; i < nz_size; i++) {
           buffer.emplace_back(data_start[i], i);
         }
-        std::partial_sort(buffer.begin(),
-                          buffer.begin() + std::min(nz_size, top_k),
-                          buffer.begin() + nz_size);
+        std::partial_sort(
+            buffer.begin(), buffer.begin() + std::min(nz_size, top_k),
+            buffer.begin() + nz_size, [](ValueAndIndex i1, ValueAndIndex i2) {
+              return i1.first > i2.first;
+            });
         std::sort(buffer.begin(), buffer.begin() + col_size,
                   [](ValueAndIndex i1, ValueAndIndex i2) {
                     return i1.second < i2.second;
@@ -130,7 +132,7 @@ template <typename Real, class SimilarityType> struct KNNComputer {
           triples.emplace_back(
               row + cursor,
               static_cast<IndexType>(index_start[buffer[j].second]),
-              data_start[buffer[j].second]);
+              buffer[j].first);
         }
       }
     }
